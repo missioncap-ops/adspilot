@@ -86,10 +86,10 @@ fi
 # -----------------------------------------------------------
 print_step 5 "Installation des serveurs MCP..."
 
-npm install -g mirroir-mcp 2>/dev/null || npm install -g mirroir-mcp
+sudo npm install -g mirroir-mcp 2>/dev/null || sudo npm install -g mirroir-mcp
 print_ok "mirroir-mcp (iPhone)"
 
-npm install -g computer-use-mcp-server 2>/dev/null || npm install -g computer-use-mcp-server
+sudo npm install -g computer-use-mcp-server 2>/dev/null || sudo npm install -g computer-use-mcp-server
 print_ok "computer-use-mcp (Mac)"
 
 # -----------------------------------------------------------
