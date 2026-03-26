@@ -7,7 +7,7 @@
 
 set -e
 
-DEVICE_ID="00008150-001260D43688401C"
+DEVICE_ID="85F14EFB-5D2C-57CB-BE72-013772898AB5"
 TEAM_ID="VK6JCSNK68"
 PROJECT_DIR="$(cd "$(dirname "$0")/ios" && pwd)"
 PROJECT_PATH="$PROJECT_DIR/AdsPilotRemote.xcodeproj"
@@ -52,13 +52,13 @@ echo -e "${BLUE}[2/3]${NC} Build de l'app..."
 xcodebuild \
     -project "$PROJECT_PATH" \
     -scheme "$SCHEME" \
-    -destination "id=$DEVICE_ID" \
+    -destination "generic/platform=iOS" \
     -allowProvisioningUpdates \
     DEVELOPMENT_TEAM="$TEAM_ID" \
     CODE_SIGN_IDENTITY="Apple Development" \
     CODE_SIGN_STYLE=Automatic \
     PROVISIONING_PROFILE_SPECIFIER="" \
-    build 2>&1 | tail -20
+    build 2>&1 | tail -30
 
 # Trouver le .app dans DerivedData
 APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "AdsPilotRemote.app" -path "*/Debug-iphoneos/*" -type d 2>/dev/null | head -1)
