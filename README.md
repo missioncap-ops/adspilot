@@ -1,50 +1,67 @@
-# AdsPilot - iPhone Remote Control Setup
+# AdsPilot - Remote Control Setup (Mac + iPhone)
 
-## Setup : Controle iPhone par Claude Code
-
-Ce repo contient un script de setup automatique pour permettre a Claude Code
-de voir et controler votre iPhone a distance.
-
-### Architecture
+## Architecture
 
 ```
 [Claude Code (Linux)] --HTTP--> [Mac + MCP Server] --iPhone Mirroring--> [iPhone]
+                                      |
+                                      +---> [ScreenPipe + cliclick] ---> [Mac Screen]
 ```
 
-### Quick Start
+## Scripts
 
-Sur votre Mac, dans le Terminal :
+| Script | Quoi | Ou le lancer |
+|---|---|---|
+| `setup-mac-control.sh` | Setup complet Mac + iPhone | Sur le Mac |
+| `setup-iphone-control.sh` | Setup iPhone uniquement | Sur le Mac |
+| `connect-to-iphone.sh` | Connexion distante au Mac | Sur la machine Linux |
+
+## Quick Start
+
+### 1. Sur votre Mac
 
 ```bash
+git clone https://github.com/missioncap-ops/adspilot.git
+cd adspilot
+git checkout claude/screen-sharing-setup-XIu7a
+
+# Setup complet (Mac + iPhone)
+bash setup-mac-control.sh
+
+# OU juste iPhone
 bash setup-iphone-control.sh
 ```
 
-Le script :
-1. Verifie macOS, Node.js, Xcode
-2. Detecte votre iPhone
-3. Installe le serveur MCP adapte (mirroir-mcp ou iPhone-mcp)
-4. Configure Claude Code
-5. Lance le serveur en mode HTTP
+### 2. Lancer les services (sur le Mac)
 
-### Pre-requis
+```bash
+# Ouvrir Recopie iPhone d'abord, puis :
+npx -y mirroir-mcp --transport http --port 3001
+```
 
-- macOS 15+ (Sequoia) pour iPhone Mirroring, OU Xcode pour iPhone-mcp
+### 3. Connexion distante (depuis Linux)
+
+```bash
+bash connect-to-iphone.sh <IP_DU_MAC> 3001
+claude
+```
+
+## Pre-requis
+
+- macOS 15+ (Sequoia) pour iPhone Mirroring
 - Node.js 18+
-- iPhone connecte en USB ou Wi-Fi
+- iPhone connecte (USB ou Wi-Fi)
 - Permissions macOS : Enregistrement de l'ecran + Accessibilite
 
-### Infos device
+## Device Info
 
 - **Device ID** : `00008150-001260D43688401C`
 - **Team ID** : `VK6JCSNK68`
-- **MCP Port** : `3001`
 
-### Capacites Claude Code
+## Capacites
 
-Une fois configure, Claude Code peut :
-- Voir l'ecran de l'iPhone en temps reel
-- Taper (tap) a des coordonnees
-- Swiper (haut, bas, gauche, droite)
-- Ecrire du texte
-- Ouvrir/fermer des apps
-- Naviguer dans iOS
+Claude Code peut :
+- Voir l'ecran Mac en temps reel (ScreenPipe)
+- Controler le Mac : cliquer, taper, scroller (computer-use MCP)
+- Voir l'ecran iPhone (mirroir-mcp)
+- Controler l'iPhone : tap, swipe, type, ouvrir apps (mirroir-mcp)
