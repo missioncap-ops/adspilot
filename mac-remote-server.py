@@ -22,14 +22,25 @@ SCREENSHOT_SMALL = '/tmp/mac_remote_small.jpg'
 def screenshot_loop():
     while True:
         try:
-            subprocess.run(
-                ['screencapture', '-x', '-t', 'jpg', '-r', SCREENSHOT_PATH],
-                timeout=2, capture_output=True
+            tmp = '/tmp/mac_remote_capture.jpg'
+            # Capture to temp file first
+            result = subprocess.run(
+                ['screencapture', '-x', '-t', 'jpg', '-r', tmp],
+                timeout=3, capture_output=True
             )
-            # Resize to 700px wide + compress to 20% quality = ~30-50KB
-            subprocess.run(
-                ['sips', '--resampleWidth', '700', '--setProperty', 'formatOptions', '20',
-                 SCREENSHOT_PATH, '--out', SCREENSHOT_SMALL],
+            if result.returncode == 0 and os.path.exists(tmp):
+                # Then resize (waits for capture to fully complete)
+                result2 = subprocess.run(
+                    ['sips', '--resampleWidth', '700', '--setProperty', 'formatOptions', '20',
+                     tmp, '--out', SCREENSHOT_SMALL],
+                    timeout=3, capture_output=True
+                )
+                if result2.returncode != 0 or not os.path.exists(SCREENSHOT_SMALL):
+                    # Fallback: copy original
+                    subprocess.run(['cp', tmp, SCREENSHOT_SMALL], capture_output=True)
+        except:
+            pass
+        time.sleep(0.3)
                 timeout=2, capture_output=True, stderr=subprocess.DEVNULL
             )
         except:
