@@ -18,39 +18,74 @@ PORT = 9090
 HTML_PAGE = """<!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 <title>Mac Remote</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: #000; color: #fff; font-family: -apple-system, sans-serif; overflow: hidden; height: 100vh; }
+body { background: #000; color: #fff; font-family: -apple-system, sans-serif; height: 100vh; overflow: hidden; }
+
 #toolbar {
-    display: flex; gap: 8px; padding: 8px; background: #1a1a1a;
-    align-items: center; flex-wrap: wrap; z-index: 10;
+    display: flex; gap: 6px; padding: 6px 8px; background: #1a1a1a;
+    align-items: center; overflow-x: auto; white-space: nowrap; z-index: 10;
+    -webkit-overflow-scrolling: touch;
 }
 #toolbar button {
-    padding: 8px 12px; border: none; border-radius: 8px;
-    background: #333; color: #fff; font-size: 14px; cursor: pointer;
+    padding: 7px 10px; border: none; border-radius: 8px; flex-shrink: 0;
+    background: #333; color: #fff; font-size: 13px; cursor: pointer;
 }
 #toolbar button:active { background: #555; }
 #toolbar button.active { background: #0a84ff; }
-#toolbar input {
-    flex: 1; min-width: 120px; padding: 8px; border: 1px solid #444;
-    border-radius: 8px; background: #222; color: #fff; font-size: 14px;
-}
+
 #screen-container {
-    position: relative; width: 100%; height: calc(100vh - 52px);
-    overflow: hidden; touch-action: none;
+    position: relative; width: 100%; height: calc(100vh - 44px);
+    overflow: auto; -webkit-overflow-scrolling: touch;
+    background: #111;
+}
+#screen-wrapper {
+    position: relative; transform-origin: 0 0;
+    display: inline-block;
 }
 #screen {
-    width: 100%; height: 100%; object-fit: contain; display: block;
+    display: block; max-width: none;
 }
+#cursor {
+    position: absolute; width: 16px; height: 16px;
+    border: 2px solid #ff3b30; border-radius: 50%;
+    background: rgba(255,59,48,0.3); pointer-events: none;
+    transform: translate(-50%, -50%); display: none; z-index: 5;
+    transition: left 0.1s, top 0.1s;
+}
+#click-indicator {
+    position: absolute; width: 40px; height: 40px;
+    border: 2px solid #0a84ff; border-radius: 50%;
+    pointer-events: none; transform: translate(-50%, -50%);
+    display: none; z-index: 6; animation: clickPulse 0.4s ease-out;
+}
+@keyframes clickPulse {
+    0% { opacity: 1; transform: translate(-50%, -50%) scale(0.3); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); }
+}
+
 #status {
-    position: fixed; bottom: 10px; right: 10px; padding: 4px 8px;
-    background: rgba(0,0,0,0.7); border-radius: 4px; font-size: 11px;
-    color: #0a84ff; z-index: 20;
+    position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
+    padding: 4px 12px; background: rgba(0,0,0,0.8); border-radius: 12px;
+    font-size: 12px; color: #0a84ff; z-index: 20; white-space: nowrap;
 }
+
+#bottom-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    display: flex; gap: 6px; padding: 8px;
+    background: #1a1a1a; border-top: 1px solid #333; z-index: 15;
+}
+#bottom-bar button {
+    flex: 1; padding: 10px; border: none; border-radius: 8px;
+    background: #333; color: #fff; font-size: 14px;
+}
+#bottom-bar button:active { background: #555; }
+#bottom-bar button.active { background: #0a84ff; }
+
 #keyboard-modal {
-    display: none; position: fixed; bottom: 0; left: 0; right: 0;
+    display: none; position: fixed; bottom: 50px; left: 0; right: 0;
     background: #1a1a1a; padding: 12px; z-index: 20;
     border-top: 1px solid #333;
 }
@@ -58,87 +93,224 @@ body { background: #000; color: #fff; font-family: -apple-system, sans-serif; ov
     width: 100%; padding: 12px; font-size: 16px; background: #222;
     border: 1px solid #444; border-radius: 8px; color: #fff;
 }
-#keyboard-modal .actions { display: flex; gap: 8px; margin-top: 8px; }
-#keyboard-modal .actions button { flex: 1; padding: 10px; }
+#keyboard-modal .actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+#keyboard-modal .actions button {
+    flex: 1; min-width: 60px; padding: 10px; border: none; border-radius: 8px;
+    background: #333; color: #fff; font-size: 13px;
+}
+#keyboard-modal .actions button:active { background: #555; }
+
+#zoom-controls {
+    position: fixed; right: 10px; top: 50px; display: flex;
+    flex-direction: column; gap: 6px; z-index: 15;
+}
+#zoom-controls button {
+    width: 40px; height: 40px; border: none; border-radius: 50%;
+    background: rgba(50,50,50,0.8); color: #fff; font-size: 20px;
+    cursor: pointer;
+}
+#zoom-controls button:active { background: rgba(100,100,100,0.8); }
+#zoom-label {
+    text-align: center; font-size: 11px; color: #aaa;
+}
 </style>
 </head>
 <body>
 
 <div id="toolbar">
-    <button onclick="refresh()">Refresh</button>
-    <button id="autoBtn" onclick="toggleAuto()">Auto: OFF</button>
-    <button onclick="showKeyboard()">Keyboard</button>
     <button onclick="sendKey('cmd+space')">Spotlight</button>
-    <button onclick="sendKey('cmd+tab')">Cmd+Tab</button>
+    <button onclick="sendKey('cmd+tab')">Switch</button>
+    <button onclick="sendKey('cmd+c')">Copy</button>
+    <button onclick="sendKey('cmd+v')">Paste</button>
+    <button onclick="sendKey('cmd+z')">Undo</button>
+    <button onclick="sendKey('cmd+a')">Sel All</button>
     <button onclick="sendKey('cmd+w')">Close</button>
     <button onclick="sendKey('cmd+q')">Quit</button>
+    <button onclick="sendKey('cmd+t')">New Tab</button>
+    <button onclick="sendKey('cmd+n')">New Win</button>
+    <button onclick="sendKey('cmd+s')">Save</button>
+    <button onclick="sendKey('escape')">Esc</button>
+    <button onclick="sendKey('tab')">Tab</button>
+    <button onclick="sendKey('up')">Up</button>
+    <button onclick="sendKey('down')">Down</button>
+    <button onclick="sendKey('left')">Left</button>
+    <button onclick="sendKey('right')">Right</button>
+</div>
+
+<div id="zoom-controls">
+    <button onclick="zoomIn()">+</button>
+    <div id="zoom-label">100%</div>
+    <button onclick="zoomOut()">-</button>
+    <button onclick="zoomFit()">Fit</button>
 </div>
 
 <div id="screen-container">
-    <img id="screen" src="/screenshot" alt="Mac Screen">
-</div>
-
-<div id="status">Ready</div>
-
-<div id="keyboard-modal">
-    <input id="textInput" placeholder="Tapez du texte ici..." autocomplete="off" autocorrect="off">
-    <div class="actions">
-        <button onclick="sendText()">Envoyer</button>
-        <button onclick="sendKey('return')">Enter</button>
-        <button onclick="sendKey('delete')">Delete</button>
-        <button onclick="hideKeyboard()">Fermer</button>
+    <div id="screen-wrapper">
+        <img id="screen" src="/screenshot" alt="Mac Screen" draggable="false">
+        <div id="cursor"></div>
+        <div id="click-indicator"></div>
     </div>
 </div>
 
+<div id="status">Tap = Click | Pinch = Zoom | Scroll = Pan</div>
+
+<div id="keyboard-modal">
+    <input id="textInput" placeholder="Tapez du texte..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    <div class="actions">
+        <button onclick="sendText()">Send</button>
+        <button onclick="sendKey('return')">Enter</button>
+        <button onclick="sendKey('delete')">Del</button>
+        <button onclick="sendKey('space')">Space</button>
+        <button onclick="hideKeyboard()">Close</button>
+    </div>
+</div>
+
+<div id="bottom-bar">
+    <button onclick="refresh()">Refresh</button>
+    <button id="autoBtn" onclick="toggleAuto()">Auto</button>
+    <button onclick="showKeyboard()">Keyboard</button>
+    <button onclick="sendRightClick()">Right Click</button>
+    <button onclick="moveMouse()">Move</button>
+</div>
+
 <script>
-const BASEURL = '';
-let autoRefresh = false;
-let autoInterval = null;
+let autoRefresh = false, autoInterval = null;
 let imgNaturalW = 1, imgNaturalH = 1;
+let currentZoom = 1;
+let lastClickX = 0, lastClickY = 0;
+let moveMode = false;
 
-const screen = document.getElementById('screen');
-const status = document.getElementById('status');
+const scr = document.getElementById('screen');
+const wrapper = document.getElementById('screen-wrapper');
+const container = document.getElementById('screen-container');
+const cursorEl = document.getElementById('cursor');
+const clickInd = document.getElementById('click-indicator');
+const statusEl = document.getElementById('status');
 
-screen.onload = function() {
-    imgNaturalW = screen.naturalWidth;
-    imgNaturalH = screen.naturalHeight;
-    setStatus('Screen loaded (' + imgNaturalW + 'x' + imgNaturalH + ')');
+scr.onload = function() {
+    imgNaturalW = scr.naturalWidth;
+    imgNaturalH = scr.naturalHeight;
+    zoomFit();
+    setStatus(imgNaturalW + 'x' + imgNaturalH);
 };
 
-// Tap to click
-screen.addEventListener('click', function(e) {
-    const rect = screen.getBoundingClientRect();
+// Touch handling for taps (not interfering with scroll)
+let touchStartX, touchStartY, touchStartTime, touchMoved;
+
+wrapper.addEventListener('touchstart', function(e) {
+    if (e.touches.length === 1) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        touchStartTime = Date.now();
+        touchMoved = false;
+    }
+}, {passive: true});
+
+wrapper.addEventListener('touchmove', function(e) {
+    if (e.touches.length === 1) {
+        const dx = e.touches[0].clientX - touchStartX;
+        const dy = e.touches[0].clientY - touchStartY;
+        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) touchMoved = true;
+    }
+}, {passive: true});
+
+wrapper.addEventListener('touchend', function(e) {
+    if (touchMoved || e.changedTouches.length !== 1) return;
+    const elapsed = Date.now() - touchStartTime;
+    if (elapsed > 500) return; // ignore long press
+
+    const touch = e.changedTouches[0];
+    const rect = scr.getBoundingClientRect();
     const scaleX = imgNaturalW / rect.width;
     const scaleY = imgNaturalH / rect.height;
-    const x = Math.round((e.clientX - rect.left) * scaleX);
-    const y = Math.round((e.clientY - rect.top) * scaleY);
-    sendClick(x, y);
+    const x = Math.round((touch.clientX - rect.left) * scaleX);
+    const y = Math.round((touch.clientY - rect.top) * scaleY);
+
+    if (x < 0 || y < 0 || x > imgNaturalW || y > imgNaturalH) return;
+
+    if (moveMode) {
+        moveTo(x, y);
+    } else {
+        sendClick(x, y);
+    }
+    showClickAt(touch.clientX - rect.left, touch.clientY - rect.top);
 });
 
-// Double tap
-let lastTap = 0;
-screen.addEventListener('touchend', function(e) {
-    const now = Date.now();
-    if (now - lastTap < 300) {
-        const touch = e.changedTouches[0];
-        const rect = screen.getBoundingClientRect();
-        const scaleX = imgNaturalW / rect.width;
-        const scaleY = imgNaturalH / rect.height;
-        const x = Math.round((touch.clientX - rect.left) * scaleX);
-        const y = Math.round((touch.clientY - rect.top) * scaleY);
-        sendClick(x, y, true);
+// Pinch zoom
+let pinchStartDist = 0, pinchStartZoom = 1;
+wrapper.addEventListener('touchstart', function(e) {
+    if (e.touches.length === 2) {
+        pinchStartDist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+        );
+        pinchStartZoom = currentZoom;
+    }
+}, {passive: true});
+
+wrapper.addEventListener('touchmove', function(e) {
+    if (e.touches.length === 2) {
+        const dist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+        );
+        const scale = dist / pinchStartDist;
+        setZoom(Math.max(0.2, Math.min(3, pinchStartZoom * scale)));
         e.preventDefault();
     }
-    lastTap = now;
-});
+}, {passive: false});
+
+function showClickAt(x, y) {
+    clickInd.style.left = x + 'px';
+    clickInd.style.top = y + 'px';
+    clickInd.style.display = 'block';
+    clickInd.style.animation = 'none';
+    clickInd.offsetHeight;
+    clickInd.style.animation = 'clickPulse 0.4s ease-out';
+    setTimeout(() => clickInd.style.display = 'none', 400);
+}
+
+function showCursorAt(x, y) {
+    cursorEl.style.left = (x / imgNaturalW * 100) + '%';
+    cursorEl.style.top = (y / imgNaturalH * 100) + '%';
+    cursorEl.style.display = 'block';
+    lastClickX = x; lastClickY = y;
+}
 
 function sendClick(x, y, dbl) {
-    setStatus('Click ' + x + ',' + y + (dbl ? ' (double)' : ''));
+    setStatus('Click ' + x + ',' + y);
+    showCursorAt(x, y);
     fetch('/click', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({x: x, y: y, double: dbl || false})
-    }).then(() => setTimeout(refresh, 300));
+    }).then(() => setTimeout(refresh, 200));
+}
+
+function sendRightClick() {
+    if (!lastClickX) { setStatus('Tap ecran d\\'abord'); return; }
+    setStatus('Right click ' + lastClickX + ',' + lastClickY);
+    fetch('/rightclick', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({x: lastClickX, y: lastClickY})
+    }).then(() => setTimeout(refresh, 200));
+}
+
+function moveTo(x, y) {
+    setStatus('Move -> ' + x + ',' + y);
+    showCursorAt(x, y);
+    fetch('/move', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({x: x, y: y})
+    });
+}
+
+function moveMouse() {
+    moveMode = !moveMode;
+    document.querySelector('#bottom-bar button:last-child').classList.toggle('active', moveMode);
+    setStatus(moveMode ? 'Mode: MOVE (tap = deplace souris)' : 'Mode: CLICK (tap = clic)');
 }
 
 function sendKey(key) {
@@ -147,34 +319,45 @@ function sendKey(key) {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({key: key})
-    }).then(() => setTimeout(refresh, 300));
+    }).then(() => setTimeout(refresh, 200));
 }
 
 function sendText() {
     const input = document.getElementById('textInput');
-    const text = input.value;
-    if (!text) return;
-    setStatus('Type: ' + text.substring(0, 20));
+    if (!input.value) return;
+    setStatus('Type: ' + input.value.substring(0, 20));
     fetch('/type', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({text: text})
-    }).then(() => { input.value = ''; setTimeout(refresh, 300); });
+        body: JSON.stringify({text: input.value})
+    }).then(() => { input.value = ''; setTimeout(refresh, 200); });
 }
 
 function refresh() {
-    screen.src = '/screenshot?' + Date.now();
+    scr.src = '/screenshot?' + Date.now();
+}
+
+function setZoom(z) {
+    currentZoom = z;
+    scr.style.width = (imgNaturalW * z) + 'px';
+    scr.style.height = (imgNaturalH * z) + 'px';
+    document.getElementById('zoom-label').textContent = Math.round(z * 100) + '%';
+}
+
+function zoomIn() { setZoom(Math.min(3, currentZoom + 0.25)); }
+function zoomOut() { setZoom(Math.max(0.2, currentZoom - 0.25)); }
+function zoomFit() {
+    const cw = container.clientWidth;
+    const ch = container.clientHeight - 50;
+    const fit = Math.min(cw / imgNaturalW, ch / imgNaturalH);
+    setZoom(fit);
 }
 
 function toggleAuto() {
     autoRefresh = !autoRefresh;
-    document.getElementById('autoBtn').textContent = 'Auto: ' + (autoRefresh ? 'ON' : 'OFF');
     document.getElementById('autoBtn').classList.toggle('active', autoRefresh);
-    if (autoRefresh) {
-        autoInterval = setInterval(refresh, 1000);
-    } else {
-        clearInterval(autoInterval);
-    }
+    if (autoRefresh) autoInterval = setInterval(refresh, 800);
+    else clearInterval(autoInterval);
 }
 
 function showKeyboard() {
@@ -184,14 +367,14 @@ function showKeyboard() {
 function hideKeyboard() {
     document.getElementById('keyboard-modal').style.display = 'none';
 }
-
-function setStatus(msg) {
-    status.textContent = msg;
-}
+function setStatus(msg) { statusEl.textContent = msg; }
 
 document.getElementById('textInput').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') { sendText(); e.preventDefault(); }
 });
+
+// Auto-refresh on start
+toggleAuto();
 </script>
 </body>
 </html>"""
@@ -253,6 +436,18 @@ class MacRemoteHandler(http.server.BaseHTTPRequestHandler):
             else:
                 subprocess.run(['cliclick', f'c:{x},{y}'], timeout=5)
             self.send_json({'status': 'ok', 'x': x, 'y': y, 'double': double})
+
+        elif path == '/rightclick':
+            x = data.get('x', 0)
+            y = data.get('y', 0)
+            subprocess.run(['cliclick', f'rc:{x},{y}'], timeout=5)
+            self.send_json({'status': 'ok', 'x': x, 'y': y, 'action': 'rightclick'})
+
+        elif path == '/move':
+            x = data.get('x', 0)
+            y = data.get('y', 0)
+            subprocess.run(['cliclick', f'm:{x},{y}'], timeout=5)
+            self.send_json({'status': 'ok', 'x': x, 'y': y, 'action': 'move'})
 
         elif path == '/key':
             key = data.get('key', '')
