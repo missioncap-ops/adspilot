@@ -13,6 +13,9 @@
 		A10000004 /* DeviceInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000014 /* DeviceInfo.swift */; };
 		A10000005 /* CommandHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000015 /* CommandHandler.swift */; };
 		A10000006 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000016 /* Assets.xcassets */; };
+		A10000007 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000017 /* MainTabView.swift */; };
+		A10000008 /* MacRemoteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000018 /* MacRemoteView.swift */; };
+		A10000009 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000019 /* SettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -23,6 +26,9 @@
 		A10000014 /* DeviceInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceInfo.swift; sourceTree = "<group>"; };
 		A10000015 /* CommandHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandHandler.swift; sourceTree = "<group>"; };
 		A10000016 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A10000017 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+		A10000018 /* MacRemoteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacRemoteView.swift; sourceTree = "<group>"; };
+		A10000019 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -52,6 +58,9 @@
 				A10000013 /* HTTPServer.swift */,
 				A10000014 /* DeviceInfo.swift */,
 				A10000015 /* CommandHandler.swift */,
+				A10000017 /* MainTabView.swift */,
+				A10000018 /* MacRemoteView.swift */,
+				A10000019 /* SettingsView.swift */,
 				A10000016 /* Assets.xcassets */,
 			);
 			path = AdsPilotRemote;
@@ -139,6 +148,9 @@
 				A10000003 /* HTTPServer.swift in Sources */,
 				A10000004 /* DeviceInfo.swift in Sources */,
 				A10000005 /* CommandHandler.swift in Sources */,
+				A10000007 /* MainTabView.swift in Sources */,
+				A10000008 /* MacRemoteView.swift in Sources */,
+				A10000009 /* SettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -203,8 +215,10 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = VK6JCSNK68;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "AdsPilot Remote";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "AdsPilot Remote needs local network access to communicate with Claude Code.";
+				INFOPLIST_FILE = AdsPilotRemote/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Remote";
+				INFOPLIST_KEY_NSAppTransportSecurity_AllowsLocalNetworking = YES;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Remote needs local network access to control your Mac and communicate with Claude Code.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -228,8 +242,10 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = VK6JCSNK68;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "AdsPilot Remote";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "AdsPilot Remote needs local network access to communicate with Claude Code.";
+				INFOPLIST_FILE = AdsPilotRemote/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Remote";
+				INFOPLIST_KEY_NSAppTransportSecurity_AllowsLocalNetworking = YES;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Remote needs local network access to control your Mac and communicate with Claude Code.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

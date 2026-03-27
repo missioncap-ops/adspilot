@@ -6,7 +6,7 @@ struct AdsPilotRemoteApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView(server: server)
+            MainTabView(server: server)
                 .onAppear {
                     server.start()
                 }
