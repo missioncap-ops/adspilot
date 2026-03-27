@@ -40,7 +40,7 @@ struct SettingsView: View {
                 Section("Mac Connection") {
                     HStack {
                         TextField("Mac IP", text: $editIP)
-                            .keyboardType(.decimalPad)
+                            .keyboardType(.numbersAndPunctuation)
                         Button("Save") {
                             macIP = editIP
                             UserDefaults.standard.set(editIP, forKey: "macIP")

@@ -37,7 +37,7 @@ struct MacRemoteView: View {
                 HStack {
                     TextField("IP du Mac (ex: 192.168.1.103)", text: $inputIP)
                         .textFieldStyle(.roundedBorder)
-                        .keyboardType(.decimalPad)
+                        .keyboardType(.numbersAndPunctuation)
                         .autocorrectionDisabled()
 
                     Button("Go") {
