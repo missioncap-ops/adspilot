@@ -41,11 +41,6 @@ def screenshot_loop():
         except:
             pass
         time.sleep(0.3)
-                timeout=2, capture_output=True, stderr=subprocess.DEVNULL
-            )
-        except:
-            pass
-        time.sleep(0.25)
 
 threading.Thread(target=screenshot_loop, daemon=True).start()
 
