@@ -335,7 +335,24 @@ function sendText() {
 }
 
 function refresh() {
-    scr.src = '/screenshot?' + Date.now();
+    // Save scroll position before refresh
+    const sx = container.scrollLeft;
+    const sy = container.scrollTop;
+    const img = new Image();
+    img.onload = function() {
+        imgNaturalW = img.naturalWidth;
+        imgNaturalH = img.naturalHeight;
+        scr.src = img.src;
+        // Restore zoom and scroll after image loads
+        scr.style.width = (imgNaturalW * currentZoom) + 'px';
+        scr.style.height = (imgNaturalH * currentZoom) + 'px';
+        // Restore scroll position on next frame
+        requestAnimationFrame(() => {
+            container.scrollLeft = sx;
+            container.scrollTop = sy;
+        });
+    };
+    img.src = '/screenshot?' + Date.now();
 }
 
 function setZoom(z) {
@@ -357,7 +374,7 @@ function zoomFit() {
 function toggleAuto() {
     autoRefresh = !autoRefresh;
     document.getElementById('autoBtn').classList.toggle('active', autoRefresh);
-    if (autoRefresh) autoInterval = setInterval(refresh, 800);
+    if (autoRefresh) autoInterval = setInterval(refresh, 1500);
     else clearInterval(autoInterval);
 }
 
