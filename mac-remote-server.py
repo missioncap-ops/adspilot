@@ -6,14 +6,33 @@ Uses: screencapture, cliclick, osascript (all pre-installed on macOS)
 """
 
 import http.server
+import socketserver
 import subprocess
 import json
 import base64
 import os
 import tempfile
 import urllib.parse
+import threading
 
 PORT = 9090
+SCREENSHOT_PATH = '/tmp/mac_remote_screen.jpg'
+screenshot_lock = threading.Lock()
+
+# Background screenshot loop - always keeps a fresh screenshot ready
+def screenshot_loop():
+    while True:
+        try:
+            subprocess.run(
+                ['screencapture', '-x', '-t', 'jpg', '-r', SCREENSHOT_PATH],
+                timeout=3, capture_output=True
+            )
+        except:
+            pass
+        import time
+        time.sleep(0.3)  # capture every 300ms
+
+threading.Thread(target=screenshot_loop, daemon=True).start()
 
 HTML_PAGE = """<!DOCTYPE html>
 <html>
@@ -285,7 +304,7 @@ function sendClick(x, y, dbl) {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({x: x, y: y, double: dbl || false})
-    }).then(() => setTimeout(refresh, 100));
+    }).then(() => refresh());
 }
 
 function sendRightClick() {
@@ -295,7 +314,7 @@ function sendRightClick() {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({x: lastClickX, y: lastClickY})
-    }).then(() => setTimeout(refresh, 100));
+    }).then(() => refresh());
 }
 
 function moveTo(x, y) {
@@ -320,7 +339,7 @@ function sendKey(key) {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({key: key})
-    }).then(() => setTimeout(refresh, 100));
+    }).then(() => refresh());
 }
 
 function sendText() {
@@ -374,7 +393,7 @@ function zoomFit() {
 function toggleAuto() {
     autoRefresh = !autoRefresh;
     document.getElementById('autoBtn').classList.toggle('active', autoRefresh);
-    if (autoRefresh) autoInterval = setInterval(refresh, 1500);
+    if (autoRefresh) autoInterval = setInterval(refresh, 500);
     else clearInterval(autoInterval);
 }
 
@@ -411,27 +430,17 @@ class MacRemoteHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(HTML_PAGE.encode())
 
         elif path == '/screenshot':
-            tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
-            tmp.close()
-            tmpjpg = tmp.name.replace('.png', '.jpg')
-            # Capture at low res then convert to small jpeg
-            subprocess.run(['screencapture', '-x', '-t', 'png', '-r', tmp.name], timeout=5)
-            # Resize to 50% and compress to low quality JPEG for speed
-            subprocess.run([
-                'sips', '-Z', '1200', '--setProperty', 'formatOptions', '30',
-                '-s', 'format', 'jpeg', tmp.name, '--out', tmpjpg
-            ], timeout=5, capture_output=True)
-            target = tmpjpg if os.path.exists(tmpjpg) else tmp.name
-            with open(target, 'rb') as f:
-                data = f.read()
-            try: os.unlink(tmp.name)
-            except: pass
-            try: os.unlink(tmpjpg)
-            except: pass
+            # Read pre-cached screenshot (updated every 300ms in background)
+            try:
+                with open(SCREENSHOT_PATH, 'rb') as f:
+                    data = f.read()
+            except:
+                data = b''
             self.send_response(200)
             self.send_header('Content-Type', 'image/jpeg')
-            self.send_header('Cache-Control', 'no-cache')
+            self.send_header('Cache-Control', 'no-cache, no-store')
             self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Content-Length', str(len(data)))
             self.end_headers()
             self.wfile.write(data)
 
@@ -460,22 +469,20 @@ class MacRemoteHandler(http.server.BaseHTTPRequestHandler):
             x = data.get('x', 0)
             y = data.get('y', 0)
             double = data.get('double', False)
-            if double:
-                subprocess.run(['cliclick', f'dc:{x},{y}'], timeout=5)
-            else:
-                subprocess.run(['cliclick', f'c:{x},{y}'], timeout=5)
+            cmd = f'dc:{x},{y}' if double else f'c:{x},{y}'
+            subprocess.Popen(['cliclick', cmd])  # non-blocking
             self.send_json({'status': 'ok', 'x': x, 'y': y, 'double': double})
 
         elif path == '/rightclick':
             x = data.get('x', 0)
             y = data.get('y', 0)
-            subprocess.run(['cliclick', f'rc:{x},{y}'], timeout=5)
+            subprocess.Popen(['cliclick', f'rc:{x},{y}'])
             self.send_json({'status': 'ok', 'x': x, 'y': y, 'action': 'rightclick'})
 
         elif path == '/move':
             x = data.get('x', 0)
             y = data.get('y', 0)
-            subprocess.run(['cliclick', f'm:{x},{y}'], timeout=5)
+            subprocess.Popen(['cliclick', f'm:{x},{y}'])
             self.send_json({'status': 'ok', 'x': x, 'y': y, 'action': 'move'})
 
         elif path == '/key':
@@ -504,12 +511,12 @@ class MacRemoteHandler(http.server.BaseHTTPRequestHandler):
             }
             cliclick_cmd = key_map.get(key, f'kp:{key}')
             args = ['cliclick'] + cliclick_cmd.split(' ')
-            subprocess.run(args, timeout=5)
+            subprocess.Popen(args)
             self.send_json({'status': 'ok', 'key': key})
 
         elif path == '/type':
             text = data.get('text', '')
-            subprocess.run(['cliclick', f't:{text}'], timeout=5)
+            subprocess.Popen(['cliclick', f't:{text}'])
             self.send_json({'status': 'ok', 'text': text})
 
         elif path == '/scroll':
@@ -590,5 +597,7 @@ if __name__ == '__main__':
   POST /applescript - Executer AppleScript
 =============================================
 """)
-    server = http.server.HTTPServer(('0.0.0.0', PORT), MacRemoteHandler)
+    class ThreadedHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+        daemon_threads = True
+    server = ThreadedHTTPServer(('0.0.0.0', PORT), MacRemoteHandler)
     server.serve_forever()
