@@ -6,7 +6,7 @@ struct MacRemoteView: View {
     var onSetIP: (String) -> Void
     @State private var inputIP: String = ""
     @State private var isConnected = false
-    @State private var reloadID = UUID()
+    @State private var reloadTrigger = false
 
     var body: some View {
         NavigationStack {
@@ -32,7 +32,7 @@ struct MacRemoteView: View {
 
             VStack(spacing: 12) {
                 HStack {
-                    TextField("IP du Mac (ex: 192.168.1.103)", text: $inputIP)
+                    TextField("IP du Mac", text: $inputIP)
                         .textFieldStyle(.roundedBorder)
                         .keyboardType(.numbersAndPunctuation)
                         .autocorrectionDisabled()
@@ -41,7 +41,6 @@ struct MacRemoteView: View {
                         let ip = inputIP.trimmingCharacters(in: .whitespaces)
                         if !ip.isEmpty {
                             onSetIP(ip)
-                            reloadID = UUID()
                             isConnected = true
                         }
                     }
@@ -51,7 +50,6 @@ struct MacRemoteView: View {
 
                 if !macIP.isEmpty {
                     Button("Reconnect to \(macIP)") {
-                        reloadID = UUID()
                         isConnected = true
                     }
                     .foregroundColor(.blue)
@@ -68,22 +66,22 @@ struct MacRemoteView: View {
 
     private var remoteView: some View {
         ZStack {
-            MacWebView(url: "http://\(macIP):9090", reloadID: reloadID)
-                .ignoresSafeArea(edges: .bottom)
+            NoCacheMacWebView(
+                urlString: "http://\(macIP):9090",
+                reload: $reloadTrigger
+            )
+            .ignoresSafeArea(edges: .bottom)
 
             VStack {
                 HStack {
                     Spacer()
-                    Button(action: {
-                        reloadID = UUID()
-                    }) {
+                    Button(action: { reloadTrigger.toggle() }) {
                         Image(systemName: "arrow.clockwise.circle.fill")
                             .font(.title2)
                             .foregroundColor(.white)
                             .shadow(radius: 4)
                     }
                     .padding(.trailing, 8)
-
                     Button(action: { isConnected = false }) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.title2)
@@ -101,43 +99,59 @@ struct MacRemoteView: View {
     }
 }
 
-struct MacWebView: UIViewRepresentable {
-    let url: String
-    let reloadID: UUID
+// Custom WebView that handles HTTP, no cache, and navigation delegate
+class WebViewCoordinator: NSObject, WKNavigationDelegate {
+    var hasLoaded = false
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        print("WebView error: \(error.localizedDescription)")
+    }
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        print("WebView provisional error: \(error.localizedDescription)")
+        // Retry after 2 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            webView.reload()
+        }
+    }
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        hasLoaded = true
+        print("WebView loaded OK")
+    }
+    func webView(_ webView: WKWebView, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        completionHandler(.performDefaultHandling, nil)
+    }
+}
+
+struct NoCacheMacWebView: UIViewRepresentable {
+    let urlString: String
+    @Binding var reload: Bool
+
+    func makeCoordinator() -> WebViewCoordinator {
+        WebViewCoordinator()
+    }
 
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
+        config.websiteDataStore = WKWebsiteDataStore.nonPersistent()
         config.allowsInlineMediaPlayback = true
-        // Disable all caching
-        config.websiteDataStore = .nonPersistent()
 
         let webView = WKWebView(frame: .zero, configuration: config)
+        webView.navigationDelegate = context.coordinator
         webView.isOpaque = false
         webView.backgroundColor = .black
         webView.scrollView.backgroundColor = .black
         webView.scrollView.bounces = false
 
-        loadURL(webView)
+        guard let url = URL(string: urlString) else { return webView }
+        var req = URLRequest(url: url)
+        req.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        req.timeoutInterval = 10
+        webView.load(req)
         return webView
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {
-        // Reload when reloadID changes
-        loadURL(uiView)
-    }
-
-    private func loadURL(_ webView: WKWebView) {
-        // Clear cache then load
-        WKWebsiteDataStore.default().removeData(
-            ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(),
-            modifiedSince: Date.distantPast
-        ) {
-            let urlString = "\(url)?nocache=\(UUID().uuidString)"
-            if let requestURL = URL(string: urlString) {
-                var request = URLRequest(url: requestURL)
-                request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-                webView.load(request)
-            }
-        }
+        // Only reload when reload button is pressed (reload binding changes)
+        // Don't reload on every SwiftUI update
     }
 }
