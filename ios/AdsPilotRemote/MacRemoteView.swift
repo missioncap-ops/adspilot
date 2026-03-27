@@ -6,6 +6,7 @@ struct MacRemoteView: View {
     var onSetIP: (String) -> Void
     @State private var inputIP: String = ""
     @State private var isConnected = false
+    @State private var reloadID = UUID()
 
     var body: some View {
         NavigationStack {
@@ -29,10 +30,6 @@ struct MacRemoteView: View {
                 .font(.title2)
                 .fontWeight(.semibold)
 
-            Text("Entrez l'IP de votre Mac\nou scannez le reseau local")
-                .multilineTextAlignment(.center)
-                .foregroundColor(.secondary)
-
             VStack(spacing: 12) {
                 HStack {
                     TextField("IP du Mac (ex: 192.168.1.103)", text: $inputIP)
@@ -44,6 +41,7 @@ struct MacRemoteView: View {
                         let ip = inputIP.trimmingCharacters(in: .whitespaces)
                         if !ip.isEmpty {
                             onSetIP(ip)
+                            reloadID = UUID()
                             isConnected = true
                         }
                     }
@@ -53,6 +51,7 @@ struct MacRemoteView: View {
 
                 if !macIP.isEmpty {
                     Button("Reconnect to \(macIP)") {
+                        reloadID = UUID()
                         isConnected = true
                     }
                     .foregroundColor(.blue)
@@ -63,27 +62,38 @@ struct MacRemoteView: View {
         }
         .navigationTitle("Mac Remote")
         .onAppear {
-            inputIP = macIP.isEmpty ? "192.168.1.103" : macIP
+            inputIP = macIP.isEmpty ? "100.86.36.26" : macIP
         }
     }
 
     private var remoteView: some View {
         ZStack {
-            MacWebView(url: "http://\(macIP):9090")
+            MacWebView(url: "http://\(macIP):9090", reloadID: reloadID)
                 .ignoresSafeArea(edges: .bottom)
 
             VStack {
-                Spacer()
                 HStack {
                     Spacer()
-                    Button(action: { isConnected = false }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title)
+                    Button(action: {
+                        reloadID = UUID()
+                    }) {
+                        Image(systemName: "arrow.clockwise.circle.fill")
+                            .font(.title2)
                             .foregroundColor(.white)
                             .shadow(radius: 4)
                     }
-                    .padding()
+                    .padding(.trailing, 8)
+
+                    Button(action: { isConnected = false }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                            .shadow(radius: 4)
+                    }
+                    .padding(.trailing, 8)
                 }
+                .padding(.top, 4)
+                Spacer()
             }
         }
         .navigationTitle("Mac Remote")
@@ -93,24 +103,41 @@ struct MacRemoteView: View {
 
 struct MacWebView: UIViewRepresentable {
     let url: String
+    let reloadID: UUID
 
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
+        // Disable all caching
+        config.websiteDataStore = .nonPersistent()
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.isOpaque = false
         webView.backgroundColor = .black
         webView.scrollView.backgroundColor = .black
         webView.scrollView.bounces = false
-        // Allow loading insecure local content
-        webView.configuration.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
 
-        if let requestURL = URL(string: url) {
-            webView.load(URLRequest(url: requestURL))
-        }
+        loadURL(webView)
         return webView
     }
 
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        // Reload when reloadID changes
+        loadURL(uiView)
+    }
+
+    private func loadURL(_ webView: WKWebView) {
+        // Clear cache then load
+        WKWebsiteDataStore.default().removeData(
+            ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(),
+            modifiedSince: Date.distantPast
+        ) {
+            let urlString = "\(url)?nocache=\(UUID().uuidString)"
+            if let requestURL = URL(string: urlString) {
+                var request = URLRequest(url: requestURL)
+                request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+                webView.load(request)
+            }
+        }
+    }
 }
