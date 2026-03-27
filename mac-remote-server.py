@@ -187,11 +187,12 @@ const cursorEl = document.getElementById('cursor');
 const clickInd = document.getElementById('click-indicator');
 const statusEl = document.getElementById('status');
 
+let firstLoad = true;
 scr.onload = function() {
     imgNaturalW = scr.naturalWidth;
     imgNaturalH = scr.naturalHeight;
-    zoomFit();
-    setStatus(imgNaturalW + 'x' + imgNaturalH);
+    if (firstLoad) { zoomFit(); firstLoad = false; }
+    else { setZoom(currentZoom); } // keep current zoom
 };
 
 // Touch handling for taps (not interfering with scroll)
@@ -284,7 +285,7 @@ function sendClick(x, y, dbl) {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({x: x, y: y, double: dbl || false})
-    }).then(() => setTimeout(refresh, 200));
+    }).then(() => setTimeout(refresh, 100));
 }
 
 function sendRightClick() {
@@ -294,7 +295,7 @@ function sendRightClick() {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({x: lastClickX, y: lastClickY})
-    }).then(() => setTimeout(refresh, 200));
+    }).then(() => setTimeout(refresh, 100));
 }
 
 function moveTo(x, y) {
@@ -319,7 +320,7 @@ function sendKey(key) {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({key: key})
-    }).then(() => setTimeout(refresh, 200));
+    }).then(() => setTimeout(refresh, 100));
 }
 
 function sendText() {
@@ -393,12 +394,23 @@ class MacRemoteHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(HTML_PAGE.encode())
 
         elif path == '/screenshot':
-            tmp = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
+            tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
             tmp.close()
-            subprocess.run(['screencapture', '-x', '-t', 'jpg', '-r', tmp.name], timeout=5)
-            with open(tmp.name, 'rb') as f:
+            tmpjpg = tmp.name.replace('.png', '.jpg')
+            # Capture at low res then convert to small jpeg
+            subprocess.run(['screencapture', '-x', '-t', 'png', '-r', tmp.name], timeout=5)
+            # Resize to 50% and compress to low quality JPEG for speed
+            subprocess.run([
+                'sips', '-Z', '1200', '--setProperty', 'formatOptions', '30',
+                '-s', 'format', 'jpeg', tmp.name, '--out', tmpjpg
+            ], timeout=5, capture_output=True)
+            target = tmpjpg if os.path.exists(tmpjpg) else tmp.name
+            with open(target, 'rb') as f:
                 data = f.read()
-            os.unlink(tmp.name)
+            try: os.unlink(tmp.name)
+            except: pass
+            try: os.unlink(tmpjpg)
+            except: pass
             self.send_response(200)
             self.send_header('Content-Type', 'image/jpeg')
             self.send_header('Cache-Control', 'no-cache')
