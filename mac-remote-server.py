@@ -22,14 +22,14 @@ SCREENSHOT_SMALL = '/tmp/mac_remote_small.jpg'
 def screenshot_loop():
     while True:
         try:
-            # Capture directly as JPEG, low quality
             subprocess.run(
                 ['screencapture', '-x', '-t', 'jpg', '-r', SCREENSHOT_PATH],
                 timeout=2, capture_output=True
             )
-            # Resize to 800px wide for speed
+            # Resize to 700px wide + compress to 20% quality = ~30-50KB
             subprocess.run(
-                ['sips', '--resampleWidth', '900', SCREENSHOT_PATH, '--out', SCREENSHOT_SMALL],
+                ['sips', '--resampleWidth', '700', '--setProperty', 'formatOptions', '20',
+                 SCREENSHOT_PATH, '--out', SCREENSHOT_SMALL],
                 timeout=2, capture_output=True, stderr=subprocess.DEVNULL
             )
         except:
