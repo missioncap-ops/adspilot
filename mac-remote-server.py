@@ -17,12 +17,24 @@ import io
 PORT = 9090
 SCREENSHOT_SMALL = '/tmp/mac_remote_small.jpg'
 
-# Store original screen dimensions for coordinate scaling
-orig_width = 1440
-orig_height = 900
+# Logical screen size (what cliclick uses - points, not pixels)
+logical_width = 1440
+logical_height = 900
+
+# Detect logical screen size at startup via osascript
+try:
+    bounds = subprocess.getoutput('osascript -e \'tell application "Finder" to get bounds of window of desktop\'')
+    parts = [int(x.strip()) for x in bounds.split(',')]
+    logical_width = parts[2]
+    logical_height = parts[3]
+    print(f"Screen logical size: {logical_width}x{logical_height}")
+except:
+    print("Could not detect screen size, using default 1440x900")
+
+# Image width after resize (must match sips --resampleWidth)
+IMG_WIDTH = 1200
 
 def screenshot_loop():
-    global orig_width, orig_height
     while True:
         try:
             tmp = '/tmp/mac_remote_capture.jpg'
@@ -31,17 +43,8 @@ def screenshot_loop():
                 timeout=3, capture_output=True
             )
             if result.returncode == 0 and os.path.exists(tmp):
-                # Get original dimensions
-                info = subprocess.run(
-                    ['sips', '-g', 'pixelWidth', '-g', 'pixelHeight', tmp],
-                    timeout=2, capture_output=True, text=True
-                )
-                for line in info.stdout.split('\n'):
-                    if 'pixelWidth' in line: orig_width = int(line.split(':')[1].strip())
-                    if 'pixelHeight' in line: orig_height = int(line.split(':')[1].strip())
-                # Resize to 1200px wide, 40% quality (sharper)
                 result2 = subprocess.run(
-                    ['sips', '--resampleWidth', '1200', '--setProperty', 'formatOptions', '40',
+                    ['sips', '--resampleWidth', str(IMG_WIDTH), '--setProperty', 'formatOptions', '40',
                      tmp, '--out', SCREENSHOT_SMALL],
                     timeout=3, capture_output=True
                 )
@@ -221,9 +224,9 @@ class H(http.server.BaseHTTPRequestHandler):
             self.send_response(200);self.send_header('Content-Type','image/jpeg');self.send_header('Cache-Control','no-store');self.send_header('Content-Length',str(len(d)));self.end_headers();self.wfile.write(d)
         elif p=='/info':
             self.j({'host':subprocess.getoutput('hostname'),'user':subprocess.getoutput('whoami'),
-                     'screen_width':orig_width,'screen_height':orig_height})
+                     'screen_width':logical_width,'screen_height':logical_height})
         elif p=='/screen-size':
-            self.j({'width':orig_width,'height':orig_height})
+            self.j({'width':logical_width,'height':logical_height})
         else:self.j({'error':'not found'},404)
 
     def do_POST(self):
@@ -234,19 +237,20 @@ class H(http.server.BaseHTTPRequestHandler):
         except:d={}
         if p=='/click':
             x,y=d.get('x',0),d.get('y',0)
-            scale=orig_width/1200 if orig_width>0 else 1
+            # Scale from image coords (IMG_WIDTH px) to logical screen coords (points)
+            scale=logical_width/IMG_WIDTH
             sx,sy=int(x*scale),int(y*scale)
             subprocess.Popen(['cliclick',f'c:{sx},{sy}'])
             self.j({'ok':1})
         elif p=='/rightclick':
             x,y=d.get('x',0),d.get('y',0)
-            scale=orig_width/1200 if orig_width>0 else 1
+            scale=logical_width/IMG_WIDTH
             sx,sy=int(x*scale),int(y*scale)
             subprocess.Popen(['cliclick',f'rc:{sx},{sy}'])
             self.j({'ok':1})
         elif p=='/move':
             x,y=d.get('x',0),d.get('y',0)
-            scale=orig_width/1200 if orig_width>0 else 1
+            scale=logical_width/IMG_WIDTH
             sx,sy=int(x*scale),int(y*scale)
             subprocess.Popen(['cliclick',f'm:{sx},{sy}'])
             self.j({'ok':1})
