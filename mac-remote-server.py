@@ -15,28 +15,37 @@ import time
 import io
 
 PORT = 9090
-SCREENSHOT_PATH = '/tmp/mac_remote_screen.jpg'
 SCREENSHOT_SMALL = '/tmp/mac_remote_small.jpg'
 
-# Capture screenshots in background, always ready
+# Store original screen dimensions for coordinate scaling
+orig_width = 1440
+orig_height = 900
+
 def screenshot_loop():
+    global orig_width, orig_height
     while True:
         try:
             tmp = '/tmp/mac_remote_capture.jpg'
-            # Capture to temp file first
             result = subprocess.run(
                 ['screencapture', '-x', '-t', 'jpg', '-r', tmp],
                 timeout=3, capture_output=True
             )
             if result.returncode == 0 and os.path.exists(tmp):
-                # Then resize (waits for capture to fully complete)
+                # Get original dimensions
+                info = subprocess.run(
+                    ['sips', '-g', 'pixelWidth', '-g', 'pixelHeight', tmp],
+                    timeout=2, capture_output=True, text=True
+                )
+                for line in info.stdout.split('\n'):
+                    if 'pixelWidth' in line: orig_width = int(line.split(':')[1].strip())
+                    if 'pixelHeight' in line: orig_height = int(line.split(':')[1].strip())
+                # Resize to 1200px wide, 40% quality (sharper)
                 result2 = subprocess.run(
-                    ['sips', '--resampleWidth', '700', '--setProperty', 'formatOptions', '20',
+                    ['sips', '--resampleWidth', '1200', '--setProperty', 'formatOptions', '40',
                      tmp, '--out', SCREENSHOT_SMALL],
                     timeout=3, capture_output=True
                 )
                 if result2.returncode != 0 or not os.path.exists(SCREENSHOT_SMALL):
-                    # Fallback: copy original
                     subprocess.run(['cp', tmp, SCREENSHOT_SMALL], capture_output=True)
         except:
             pass
@@ -211,7 +220,10 @@ class H(http.server.BaseHTTPRequestHandler):
             except:d=b''
             self.send_response(200);self.send_header('Content-Type','image/jpeg');self.send_header('Cache-Control','no-store');self.send_header('Content-Length',str(len(d)));self.end_headers();self.wfile.write(d)
         elif p=='/info':
-            self.j({'host':subprocess.getoutput('hostname'),'user':subprocess.getoutput('whoami')})
+            self.j({'host':subprocess.getoutput('hostname'),'user':subprocess.getoutput('whoami'),
+                     'screen_width':orig_width,'screen_height':orig_height})
+        elif p=='/screen-size':
+            self.j({'width':orig_width,'height':orig_height})
         else:self.j({'error':'not found'},404)
 
     def do_POST(self):
@@ -222,13 +234,21 @@ class H(http.server.BaseHTTPRequestHandler):
         except:d={}
         if p=='/click':
             x,y=d.get('x',0),d.get('y',0)
-            subprocess.Popen(['cliclick',f'c:{x},{y}'])
+            scale=orig_width/1200 if orig_width>0 else 1
+            sx,sy=int(x*scale),int(y*scale)
+            subprocess.Popen(['cliclick',f'c:{sx},{sy}'])
             self.j({'ok':1})
         elif p=='/rightclick':
-            subprocess.Popen(['cliclick',f'rc:{d.get("x",0)},{d.get("y",0)}'])
+            x,y=d.get('x',0),d.get('y',0)
+            scale=orig_width/1200 if orig_width>0 else 1
+            sx,sy=int(x*scale),int(y*scale)
+            subprocess.Popen(['cliclick',f'rc:{sx},{sy}'])
             self.j({'ok':1})
         elif p=='/move':
-            subprocess.Popen(['cliclick',f'm:{d.get("x",0)},{d.get("y",0)}'])
+            x,y=d.get('x',0),d.get('y',0)
+            scale=orig_width/1200 if orig_width>0 else 1
+            sx,sy=int(x*scale),int(y*scale)
+            subprocess.Popen(['cliclick',f'm:{sx},{sy}'])
             self.j({'ok':1})
         elif p=='/key':
             km={'return':'kp:return','delete':'kp:delete','escape':'kp:escape','tab':'kp:tab','space':'kp:space',

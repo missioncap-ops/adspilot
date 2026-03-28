@@ -183,14 +183,21 @@ struct NativeRemoteScreen: View {
     }
 
     func fetchScreen() {
-        guard let url = URL(string: "\(baseURL)/screenshot?\(Date().timeIntervalSince1970)") else { return }
-        URLSession.shared.dataTask(with: url) { data, _, error in
+        guard let url = URL(string: "\(baseURL)/screenshot?\(Int(Date().timeIntervalSince1970 * 1000))") else { return }
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 3
+        req.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        URLSession.shared.dataTask(with: req) { data, response, error in
+            if let error = error {
+                DispatchQueue.main.async { statusText = "Error: \(error.localizedDescription)" }
+                return
+            }
             if let data = data, let img = UIImage(data: data) {
                 DispatchQueue.main.async {
                     screenImage = img
                     imageWidth = img.size.width
                     imageHeight = img.size.height
-                    if statusText == "Connecting..." {
+                    if statusText == "Connecting..." || statusText.hasPrefix("Error") {
                         statusText = "\(Int(img.size.width))x\(Int(img.size.height)) | Tap = Click"
                     }
                 }
@@ -232,7 +239,8 @@ struct NativeRemoteScreen: View {
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        req.timeoutInterval = 5
+        req.timeoutInterval = 3
+        req.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
         URLSession.shared.dataTask(with: req) { _, _, _ in }.resume()
     }
 }
